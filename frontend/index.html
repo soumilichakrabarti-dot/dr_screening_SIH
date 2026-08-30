@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Explainable DR Screening — Demo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --paper: #15110C;
+    --panel: #1F1912;
+    --panel-hi: #2A2117;
+    --stroke: #3A2F22;
+    --ink: #F3E9D8;
+    --ink-dim: #B0A28A;
+    --amber: #E0812F;
+    --amber-soft: rgba(224,129,47,0.16);
+    --teal: #4FB6A4;
+    --danger: #E2604A;
+    --ok: #6FBF8F;
+    --warn: #E0B95A;
+    --radius: 20px;
+    --font-display: 'Space Grotesk', system-ui, sans-serif;
+    --font-body: 'IBM Plex Sans', -apple-system, sans-serif;
+    --font-mono: 'IBM Plex Mono', 'Courier New', monospace;
+  }
+  * { box-sizing: border-box; }
+  body {
+    background: var(--paper);
+    background-image:
+      radial-gradient(ellipse 900px 500px at 15% -10%, rgba(224,129,47,0.10), transparent 60%),
+      radial-gradient(ellipse 700px 500px at 100% 10%, rgba(79,182,164,0.08), transparent 60%);
+    color: var(--ink);
+    font-family: var(--font-body);
+    margin: 0;
+    padding: 32px 20px 60px;
+    min-height: 100vh;
+  }
+  .wrap { max-width: 880px; margin: 0 auto; }
+
+  /* ---- Header ---- */
+  .eyebrow {
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--teal);
+    margin-bottom: 10px;
+  }
+  h1 {
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: clamp(1.6rem, 4vw, 2.3rem);
+    margin: 0 0 8px;
+    letter-spacing: -0.01em;
+  }
+  p.subtitle {
+    color: var(--ink-dim);
+    margin: 0 0 32px;
+    font-size: 0.98rem;
+    max-width: 55ch;
+    line-height: 1.5;
+  }
+
+  /* ---- Card shell ---- */
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--stroke);
+    border-radius: var(--radius);
+    padding: 28px;
+    margin-bottom: 20px;
+  }
+
+  /* ---- Viewfinder (circular camera-dial frame) ---- */
+  .viewfinder-row { display: flex; justify-content: center; }
+  .viewfinder {
+    position: relative;
+    width: 220px;
+    height: 220px;
+    border-radius: 50%;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+  .viewfinder::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    background:
+      repeating-conic-gradient(var(--stroke) 0deg 1.2deg, transparent 1.2deg 9deg);
+    -webkit-mask: radial-gradient(circle, transparent 92%, black 93%, black 100%);
+            mask: radial-gradient(circle, transparent 92%, black 93%, black 100%);
+    transition: background 0.2s;
+  }
+  .viewfinder:hover::before, .viewfinder:focus-visible::before {
+    background: repeating-conic-gradient(var(--amber) 0deg 1.2deg, transparent 1.2deg 9deg);
+  }
+  .viewfinder-inner {
+    position: relative;
+    width: 180px;
+    height: 180px;
+    border-radius: 50%;
+    background: var(--panel-hi);
+    border: 1px solid var(--stroke);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    text-align: center;
+  }
+  .viewfinder-inner img {
+    width: 100%; height: 100%; object-fit: cover;
+  }
+  .viewfinder-hint {
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    color: var(--ink-dim);
+    padding: 0 20px;
+    line-height: 1.5;
+  }
+  .viewfinder-hint svg { display: block; margin: 0 auto 8px; opacity: 0.6; }
+  input[type=file] { display: none; }
+
+  /* scan sweep while analyzing */
+  .scanning .viewfinder-inner::after {
+    content: "";
+    position: absolute; inset: 0;
+    background: conic-gradient(from 0deg, transparent 0%, var(--amber) 8%, transparent 16%);
+    animation: sweep 1.1s linear infinite;
+  }
+  @keyframes sweep { to { transform: rotate(360deg); } }
+  @media (prefers-reduced-motion: reduce) {
+    .scanning .viewfinder-inner::after { animation: none; }
+  }
+
+  .file-label {
+    display: block;
+    text-align: center;
+    margin-top: 14px;
+    font-size: 0.85rem;
+    color: var(--ink-dim);
+  }
+
+  button {
+    display: block;
+    margin: 20px auto 0;
+    background: var(--amber);
+    color: #1A0F05;
+    border: none;
+    padding: 12px 28px;
+    border-radius: 10px;
+    font-family: var(--font-display);
+    font-weight: 600;
+    font-size: 0.95rem;
+    cursor: pointer;
+    transition: transform 0.1s, background 0.15s;
+  }
+  button:hover:not(:disabled) { background: #ED9346; }
+  button:active:not(:disabled) { transform: scale(0.98); }
+  button:disabled { opacity: 0.4; cursor: not-allowed; }
+  button:focus-visible, .viewfinder:focus-visible { outline: 2px solid var(--amber); outline-offset: 3px; }
+
+  .loading {
+    display: none;
+    text-align: center;
+    color: var(--ink-dim);
+    font-family: var(--font-mono);
+    font-size: 0.85rem;
+    padding: 16px 0 0;
+  }
+
+  /* ---- Results ---- */
+  .results { display: none; }
+  .compare-row {
+    display: flex;
+    gap: 32px;
+    justify-content: center;
+    flex-wrap: wrap;
+    margin-bottom: 28px;
+  }
+  .compare-item { text-align: center; }
+  .compare-item .viewfinder { width: 160px; height: 160px; cursor: default; }
+  .compare-item .viewfinder-inner { width: 128px; height: 128px; }
+  .compare-label {
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--ink-dim);
+    margin-top: 10px;
+  }
+
+  .grade-line { text-align: center; margin-bottom: 24px; }
+  .grade-name {
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: 1.7rem;
+  }
+  .grade-name.g0 { color: var(--ok); }
+  .grade-name.g1 { color: var(--warn); }
+  .grade-name.g2, .grade-name.g3, .grade-name.g4 { color: var(--danger); }
+  .confidence-line {
+    font-family: var(--font-mono);
+    font-size: 0.85rem;
+    color: var(--ink-dim);
+    margin-top: 4px;
+  }
+  .confidence-line span { color: var(--ink); }
+
+  /* ---- Severity scale: information-encoding, not decorative ---- */
+  .severity-scale { margin: 0 auto 28px; max-width: 480px; }
+  .severity-track {
+    position: relative;
+    height: 8px;
+    border-radius: 4px;
+    background: linear-gradient(90deg, var(--ok), var(--warn) 40%, var(--danger) 100%);
+    margin-bottom: 10px;
+  }
+  .severity-marker {
+    position: absolute;
+    top: 50%;
+    width: 16px; height: 16px;
+    background: var(--paper);
+    border: 3px solid var(--ink);
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+    transition: left 0.4s ease;
+  }
+  .severity-labels {
+    display: flex;
+    justify-content: space-between;
+    font-family: var(--font-mono);
+    font-size: 0.65rem;
+    color: var(--ink-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+  }
+  .severity-labels span { flex: 1; text-align: center; }
+  .severity-labels span:first-child { text-align: left; }
+  .severity-labels span:last-child { text-align: right; }
+
+  .explanation {
+    line-height: 1.6;
+    color: var(--ink);
+    font-size: 0.96rem;
+    max-width: 60ch;
+    margin: 0 auto 20px;
+  }
+
+  .triage {
+    border-left: 3px solid var(--amber);
+    background: var(--amber-soft);
+    padding: 14px 18px;
+    border-radius: 0 10px 10px 0;
+    font-family: var(--font-display);
+    font-weight: 600;
+    font-size: 0.92rem;
+    margin-bottom: 18px;
+  }
+  .triage.ok { border-color: var(--ok); background: rgba(111,191,143,0.12); }
+  .triage.warn { border-color: var(--warn); background: rgba(224,185,90,0.12); }
+  .triage.danger { border-color: var(--danger); background: rgba(226,96,74,0.12); }
+
+  .top3 {
+    font-family: var(--font-mono);
+    font-size: 0.78rem;
+    color: var(--ink-dim);
+    display: flex;
+    gap: 18px;
+    flex-wrap: wrap;
+  }
+
+  .footer-note {
+    font-size: 0.78rem;
+    color: var(--ink-dim);
+    margin-top: 28px;
+    line-height: 1.5;
+    text-align: center;
+  }
+  .footer-note code {
+    font-family: var(--font-mono);
+    background: var(--panel-hi);
+    padding: 1px 6px;
+    border-radius: 4px;
+  }
+
+  @media (max-width: 480px) {
+    .compare-row { gap: 20px; }
+    .compare-item .viewfinder { width: 130px; height: 130px; }
+    .compare-item .viewfinder-inner { width: 104px; height: 104px; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="eyebrow">AI-Assisted Screening · Explainable Output</div>
+  <h1>Diabetic Retinopathy Screening</h1>
+  <p class="subtitle">Upload a retinal fundus image for a severity grade, a visual explanation of the model's reasoning, and a referral recommendation.</p>
+
+  <div class="card">
+    <div class="viewfinder-row">
+      <div class="viewfinder" id="uploadZone" tabindex="0" role="button" aria-label="Upload fundus image">
+        <div class="viewfinder-inner" id="viewfinderInner">
+          <div class="viewfinder-hint" id="uploadHint">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="3.5"/><path d="M3 12c2-4 6-6 9-6s7 2 9 6c-2 4-6 6-9 6s-7-2-9-6z"/></svg>
+            Tap to select<br>a fundus photo
+          </div>
+        </div>
+      </div>
+    </div>
+    <input type="file" id="fileInput" accept="image/*">
+    <div class="file-label" id="fileLabel">No image selected</div>
+    <button id="analyzeBtn" disabled>Analyze Image</button>
+    <div class="loading" id="loading">Analyzing retinal image…</div>
+  </div>
+
+  <div class="results card" id="results">
+    <div class="compare-row">
+      <div class="compare-item">
+        <div class="viewfinder"><div class="viewfinder-inner"><img id="originalImg" alt="Original fundus image"></div></div>
+        <div class="compare-label">Original</div>
+      </div>
+      <div class="compare-item">
+        <div class="viewfinder"><div class="viewfinder-inner"><img id="heatmapImg" alt="Grad-CAM heatmap"></div></div>
+        <div class="compare-label">Model attention</div>
+      </div>
+    </div>
+
+    <div class="grade-line">
+      <div class="grade-name" id="gradeName">—</div>
+      <div class="confidence-line">Confidence: <span id="confText">—</span></div>
+    </div>
+
+    <div class="severity-scale">
+      <div class="severity-track">
+        <div class="severity-marker" id="severityMarker" style="left:0%"></div>
+      </div>
+      <div class="severity-labels">
+        <span>No DR</span><span>Mild</span><span>Moderate</span><span>Severe</span><span>PDR</span>
+      </div>
+    </div>
+
+    <p class="explanation" id="explanationText"></p>
+    <div class="triage" id="triageBox"></div>
+    <div class="top3" id="top3Box"></div>
+  </div>
+
+  <p class="footer-note">
+    Demo interface for hackathon use. Not a certified medical device — all outputs should be confirmed by a qualified ophthalmologist.<br>
+    Backend expected at <code>http://localhost:8000/predict</code>.
+  </p>
+</div>
+
+<script>
+const API_URL = "http://localhost:8000/predict";
+
+const fileInput = document.getElementById("fileInput");
+const uploadZone = document.getElementById("uploadZone");
+const viewfinderInner = document.getElementById("viewfinderInner");
+const uploadHint = document.getElementById("uploadHint");
+const fileLabel = document.getElementById("fileLabel");
+const analyzeBtn = document.getElementById("analyzeBtn");
+const loading = document.getElementById("loading");
+const results = document.getElementById("results");
+
+let selectedFile = null;
+
+uploadZone.addEventListener("click", () => fileInput.click());
+uploadZone.addEventListener("keydown", (e) => {
+  if (e.key === "Enter" || e.key === " ") { e.preventDefault(); fileInput.click(); }
+});
+
+fileInput.addEventListener("change", (e) => {
+  selectedFile = e.target.files[0];
+  if (selectedFile) {
+    fileLabel.textContent = selectedFile.name;
+    analyzeBtn.disabled = false;
+    const previewUrl = URL.createObjectURL(selectedFile);
+    viewfinderInner.innerHTML = `<img src="${previewUrl}" alt="Selected fundus image">`;
+  }
+});
+
+analyzeBtn.addEventListener("click", async () => {
+  if (!selectedFile) return;
+  loading.style.display = "block";
+  results.style.display = "none";
+  analyzeBtn.disabled = true;
+  uploadZone.classList.add("scanning");
+
+  const formData = new FormData();
+  formData.append("file", selectedFile);
+
+  try {
+    const res = await fetch(API_URL, { method: "POST", body: formData });
+    const data = await res.json();
+    renderResults(data, selectedFile);
+  } catch (err) {
+    loading.textContent = "Error reaching backend — is app.py running on port 8000?";
+    console.error(err);
+    uploadZone.classList.remove("scanning");
+    return;
+  }
+  loading.style.display = "none";
+  analyzeBtn.disabled = false;
+  uploadZone.classList.remove("scanning");
+});
+
+function urgencyClass(grade) {
+  if (grade === 0) return "ok";
+  if (grade === 1) return "warn";
+  return "danger";
+}
+
+function renderResults(data, file) {
+  document.getElementById("originalImg").src = URL.createObjectURL(file);
+  document.getElementById("heatmapImg").src = "data:image/png;base64," + data.heatmap_base64;
+
+  const gradeName = document.getElementById("gradeName");
+  gradeName.textContent = `${data.label} (Grade ${data.grade})`;
+  gradeName.className = "grade-name g" + data.grade;
+
+  document.getElementById("confText").textContent = (data.confidence * 100).toFixed(0) + "%";
+
+  // marker sits at grade position across 5 slots (0,25,50,75,100%)
+  const markerPos = (data.grade / 4) * 100;
+  document.getElementById("severityMarker").style.left = markerPos + "%";
+
+  document.getElementById("explanationText").textContent = data.explanation;
+
+  const triageBox = document.getElementById("triageBox");
+  triageBox.textContent = "Recommended action: " + data.triage;
+  triageBox.className = "triage " + urgencyClass(data.grade);
+
+  const top3 = data.top3.map(t => `${t.label}: ${(t.confidence*100).toFixed(1)}%`).join("  ·  ");
+  document.getElementById("top3Box").textContent = top3;
+
+  results.style.display = "block";
+  results.scrollIntoView({ behavior: "smooth", block: "nearest" });
+}
+</script>
+</body>
+</html>
