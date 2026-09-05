@@ -1,5 +1,13 @@
 # Explainable AI for Diabetic Retinopathy Screening — SIH 2026 (PS #26038)
 
+## Update: class-imbalance fix applied
+The training dataset is heavily skewed toward "No DR" images. The current
+model checkpoint was retrained with **class-weighted loss** (via
+`sklearn.utils.class_weight.compute_class_weight`, applied in the training
+notebook) to correct for this — earlier versions of the model leaned toward
+predicting "No DR" even on clearly disease-positive images. See
+`notebook/DR_Screening_Learn_And_Build.ipynb` for the fix.
+
 ## What's here
 - `backend/model.py` — EfficientNet-B0, 5-class DR grading (ICDR scale)
 - `backend/train.py` — fine-tuning script for APTOS 2019 / IDRiD-style CSV+image datasets
@@ -64,9 +72,19 @@ Upload a fundus image, hit Analyze.
    goes a long way for the "who actually uses this" narrative.
 5. **Triage/referral output** — you already get this from `TRIAGE` in
    `model.py`; consider rendering it as a printable/shareable referral slip.
-6. **Quality-check gate** — reject blurry/underexposed images before
-   diagnosis (simple Laplacian-variance blur check is enough) — shows you
-   understand real capture conditions, not just clean benchmark images.
+6. ~~**Quality-check gate**~~ — **Done**, implemented in MATLAB
+   (`matlab/assess_image_quality.m`, `matlab/enhance_image.m`) — checks
+   focus, illumination, and field of view, with CLAHE-based enhancement
+   for borderline images and specific recapture feedback for rejected ones.
+7. ~~**Systems-level resource modeling**~~ — **Done**, implemented in
+   Simulink (`matlab/build_comparison_model.m`) — models patient arrival
+   vs. review capacity to check district-level staffing sustainability.
+8. ~~**Basic structure extraction**~~ — **Partially done**, implemented in
+   MATLAB (`matlab/locate_optic_disc.m`, `matlab/extract_vessels.m`) —
+   optic disc localization via Hough transform and vessel network
+   extraction via multi-orientation morphological filtering. Full lesion
+   segmentation (microaneurysms, exudates, hemorrhages, neovascularization)
+   remains out of scope for this timeline.
 
 ## Not a medical device
 Keep this disclaimer visible in the demo — judges will ask about liability
