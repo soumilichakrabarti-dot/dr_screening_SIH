@@ -10,10 +10,11 @@
 %   2. Edit the imageFiles list below to match your uploaded filenames.
 %   3. Click Run (the green triangle) or press F5.
 
-imageFiles = {
-    'sample1.png'   % <-- replace with your actual uploaded filenames
-    'sample2.png'
-};
+   imageFiles = {
+       'clear_eye.jpg'
+       'dr_eye.jpg'
+       'synthetic_blurry.jpg'
+   };
 
 for i = 1:length(imageFiles)
     imgPath = imageFiles{i};
