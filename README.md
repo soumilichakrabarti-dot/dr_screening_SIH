@@ -78,7 +78,7 @@ ophthalmologist review capacity at district scale.
 ## Getting Started
 
 ```bash
-git clone <repo-url>
+git clone <https://github.com/soumilichakrabarti-dot/dr_screening_SIH>
 cd dr-screening
 pip install -r requirements.txt
 ```
