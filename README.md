@@ -1,93 +1,118 @@
-# Explainable AI for Diabetic Retinopathy Screening — SIH 2026 (PS #26038)
+# Explainable AI for Diabetic Retinopathy Screening
 
-## Update: class-imbalance fix applied
-The training dataset is heavily skewed toward "No DR" images. The current
-model checkpoint was retrained with **class-weighted loss** (via
-`sklearn.utils.class_weight.compute_class_weight`, applied in the training
-notebook) to correct for this — earlier versions of the model leaned toward
-predicting "No DR" even on clearly disease-positive images. See
-`notebook/DR_Screening_Learn_And_Build.ipynb` for the fix.
+**Smart India Hackathon 2026 · Problem Statement #26038**
 
-## What's here
-- `backend/model.py` — EfficientNet-B0, 5-class DR grading (ICDR scale)
-- `backend/train.py` — fine-tuning script for APTOS 2019 / IDRiD-style CSV+image datasets
-- `backend/gradcam.py` — Grad-CAM++ heatmap + plain-language explanation generator
-- `backend/app.py` — FastAPI server exposing `POST /predict`
-- `frontend/index.html` — single-file demo UI (upload image → grade + heatmap + triage)
+An AI-assisted screening system that grades diabetic retinopathy severity from retinal fundus photographs and explains its reasoning visually — built for deployment in low-resource, rural healthcare settings.
 
-## Setup
+---
+
+## Overview
+
+Diabetic retinopathy is a leading cause of preventable blindness in India, but early screening requires ophthalmologist expertise that is scarce in rural areas. This project combines a deep learning classification pipeline with visual explainability, automated image quality control, and systems-level resource modeling to deliver a screening tool that is both clinically interpretable and practically deployable at scale.
+
+## Key Features
+
+- **DR Severity Grading** — classifies retinal images across the 5-level International Clinical Diabetic Retinopathy (ICDR) scale, from No DR to Proliferative DR
+- **Visual Explainability** — Grad-CAM++ heatmaps show which regions of the image drove each prediction, paired with a plain-language explanation
+- **Automated Triage** — every prediction includes a concrete referral recommendation, not just a raw grade
+- **Image Quality Assessment** — rejects unusable photos (blur, poor illumination, bad framing) before diagnosis, with specific recapture feedback
+- **Retinal Structure Extraction** — optic disc localization and vessel network extraction using classical image processing
+- **District-Scale Resource Modeling** — Simulink simulation validating screening throughput and staffing requirements for 100,000+ patients/year
+
+## Tech Stack
+
+| Layer | Technology |
+|---|---|
+| Model | PyTorch, EfficientNet-B0 (transfer learning) |
+| Explainability | Grad-CAM++ |
+| Backend | FastAPI |
+| Frontend | HTML/CSS/JavaScript |
+| Image Quality & Structure Extraction | MATLAB (Image Processing Toolbox, Computer Vision Toolbox) |
+| Systems Modeling | Simulink |
+| Training Data | APTOS 2019 Blindness Detection (Kaggle) |
+
+## System Architecture
+
+```
+Fundus Photograph
+       │
+       ▼
+Image Quality Assessment (MATLAB)
+       │  reject + recapture feedback, or
+       │  CLAHE enhancement for borderline images
+       ▼
+DR Severity Classification (EfficientNet-B0)
+       │
+       ▼
+Grad-CAM++ Explanation ──── Optic Disc / Vessel Extraction (MATLAB)
+       │
+       ▼
+Triage Recommendation
+
+Separately: Simulink model validates patient throughput vs.
+ophthalmologist review capacity at district scale.
+```
+
+## Repository Structure
+
+```
+├── backend/              FastAPI server, model, training, Grad-CAM
+│   ├── app.py
+│   ├── model.py
+│   ├── train.py
+│   └── gradcam.py
+├── frontend/              Web demo interface
+│   └── index.html
+├── notebook/              Model training (Google Colab)
+│   └── DR_Screening_Learn_And_Build.ipynb
+├── matlab/                Image quality, structure extraction, Simulink models
+│   ├── assess_image_quality.m
+│   ├── enhance_image.m
+│   ├── locate_optic_disc.m
+│   ├── extract_vessels.m
+│   ├── build_screening_model.m
+│   └── build_comparison_model.m
+└── requirements.txt
+```
+
+## Getting Started
+
 ```bash
+git clone <repo-url>
 cd dr-screening
 pip install -r requirements.txt
 ```
 
-## 1. Get data
-Download **APTOS 2019 Blindness Detection** from Kaggle (has `train.csv` with
-`id_code,diagnosis` columns — matches `train.py` defaults) or **IDRiD** (also
-gives lesion segmentation masks — use these to make the explanation far
-stronger than the grid-zone heuristic currently in `gradcam.py`).
-
-Put images in `data/aptos/train_images/`, csv at `data/aptos/train.csv`.
-
-## 2. Train
+Train the model (or use a provided checkpoint):
 ```bash
 cd backend
-python train.py --data_dir ../data/aptos/train_images --csv ../data/aptos/train.csv --epochs 15
-```
-This saves the best checkpoint to `checkpoints/dr_effnet_b0.pt`.
-
-## 3. Point the API at your checkpoint
-In `backend/app.py`, set:
-```python
-WEIGHTS_PATH = "checkpoints/dr_effnet_b0.pt"
+python train.py --data_dir <path-to-images> --csv <path-to-labels.csv> --epochs 20
 ```
 
-## 4. Run the backend
+Run the backend:
 ```bash
-cd backend
 uvicorn app:app --host 0.0.0.0 --port 8000 --reload
 ```
 
-## 5. Open the frontend
-Just open `frontend/index.html` in a browser (no build step needed).
-Upload a fundus image, hit Analyze.
+Open `frontend/index.html` in a browser and upload a fundus image.
 
----
+MATLAB scripts in `matlab/` are self-contained — open in MATLAB Online or Desktop and run directly.
 
-## Roadmap for the hackathon (priority order)
-1. **Get a trained baseline working end-to-end** (even a few epochs) — this is
-   the single most important thing, everything else builds on it.
-2. **Swap the grid-zone explanation for real lesion overlap** using IDRiD's
-   lesion masks (microaneurysms / hemorrhages / exudates) and report IoU or
-   simple overlap % between Grad-CAM hot regions and actual lesion masks.
-   This is what will make your explainability story credible to judges vs.
-   "we added Grad-CAM."
-2b. Consider adding LIME or SHAP as a second explanation method to show
-   agreement/consistency between methods — a nice slide, not required.
-3. **Quantize the model** (ONNX or TFLite export) and show it running fast
-   on CPU only — ties directly into the "rural, low-bandwidth, low-cost
-   hardware" part of the problem statement.
-4. **Multilingual explanation text** — even a simple dictionary-based
-   translation of the explanation templates into Hindi/regional language
-   goes a long way for the "who actually uses this" narrative.
-5. **Triage/referral output** — you already get this from `TRIAGE` in
-   `model.py`; consider rendering it as a printable/shareable referral slip.
-6. ~~**Quality-check gate**~~ — **Done**, implemented in MATLAB
-   (`matlab/assess_image_quality.m`, `matlab/enhance_image.m`) — checks
-   focus, illumination, and field of view, with CLAHE-based enhancement
-   for borderline images and specific recapture feedback for rejected ones.
-7. ~~**Systems-level resource modeling**~~ — **Done**, implemented in
-   Simulink (`matlab/build_comparison_model.m`) — models patient arrival
-   vs. review capacity to check district-level staffing sustainability.
-8. ~~**Basic structure extraction**~~ — **Partially done**, implemented in
-   MATLAB (`matlab/locate_optic_disc.m`, `matlab/extract_vessels.m`) —
-   optic disc localization via Hough transform and vessel network
-   extraction via multi-orientation morphological filtering. Full lesion
-   segmentation (microaneurysms, exudates, hemorrhages, neovascularization)
-   remains out of scope for this timeline.
+## Results
 
-## Not a medical device
-Keep this disclaimer visible in the demo — judges will ask about liability
-and regulatory pathway (CDSCO / ICMR guidelines) even briefly, so have one
-sentence ready on how a real deployment would need clinical validation and
-ophthalmologist sign-off, not full autonomy.
+- Trained on APTOS 2019 with class-weighted loss to correct for dataset imbalance
+- Simulink resource model: AI-assisted review (≈60 images/hour/ophthalmologist) sustains zero backlog at 100,000+ patients/year with a single reviewing ophthalmologist; traditional manual review (≈6 images/hour) results in unbounded backlog growth under identical patient load
+- Image quality module validated against known clear, disease-positive, and degraded test images with correct pass/reject behavior
+
+## Limitations
+
+- Trained on a limited public dataset; not yet validated to clinical sensitivity/specificity standards
+- Full lesion-level segmentation (microaneurysms, neovascularization) is not implemented — a research-scale problem beyond this project's current scope
+- Intended as a triage-assist tool; not a certified medical device. All outputs require ophthalmologist confirmation before any clinical decision.
+
+## References
+
+- [APTOS 2019 Blindness Detection Dataset](https://www.kaggle.com/c/aptos2019-blindness-detection) — Kaggle
+- [IDRiD (Indian Diabetic Retinopathy Image Dataset)](https://idrid.grand-challenge.org/) — planned for future lesion-level validation
+- Selvaraju et al., *Grad-CAM: Visual Explanations from Deep Networks via Gradient-based Localization*
+- International Clinical Diabetic Retinopathy (ICDR) Severity Scale
